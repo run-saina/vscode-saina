@@ -1,7 +1,7 @@
 {
   "name": "saina",
   "displayName": "Saina",
-  "description": "Saina Helm models in your editor: the Saina MCP server for agent mode, typed decisions on selected text, and recent decisions from Studio",
+  "description": "Saina Helm decision models in your editor: the Saina Studio MCP server for agent mode, decisions on selected text, and recent decisions from Studio",
   "version": "0.1.0",
   "publisher": "saina",
   "license": "MIT",

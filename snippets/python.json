@@ -8,7 +8,7 @@
       "# Reads SAINA_API_KEY from the environment.",
       "client = Saina()",
       "answers = client.ask(",
-      "    model='${1|saina-helm,saina-helm-3-0.8b,saina-helm-2-0.8b,saina-helm-0.8b|}',",
+      "    model='${1|saina-helm,saina-helm-3-0.8b,saina-helm-2-0.8b,saina-helm-2-omni-0.8b,saina-helm-2-routing-0.8b|}',",
       "    state=${2:text},",
       "    questions={",
       "        '${3:team}': {",
