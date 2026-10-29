@@ -1,11 +1,13 @@
 # Saina for VS Code and Cursor
 
-Saina builds small, open decision models for apps, agents and automated workflows. Its Helm model family scores the options an application supplies for routing requests, classifying inputs, selecting tools and checking results. This extension brings Helm and Saina Studio into VS Code and Cursor.
+Saina is the decision layer for software systems. It builds specialist AI decision models and the developer platform around them. Developers use Saina to turn model predictions into versioned decision endpoints, observe how those decisions perform in production, turn failures into test cases, and improve their models or policies without breaking existing behavior. Saina works with open models and external inference providers, so teams can use their own infrastructure.
 
-- **Saina MCP server for agent mode.** The extension registers `https://api.saina.run/v1/mcp`, so Copilot agent mode in VS Code and Cursor's agent can read your endpoints, decisions, traces, evals and datasets. It signs in with OAuth the first time a tool runs.
-- **Run Decision on Selection.** Select text or JSON, pick a model or endpoint, and ask a Yes / No, Choose one or Rate on a scale question. The answer shows in a notification and the **Saina** output channel.
-- **Models.** Every Saina Helm model your account can use (Helm 3 `saina-helm-3-0.8b`, Helm 2 `saina-helm-2-0.8b`, Helm 2 Omni `saina-helm-2-omni-0.8b`, Helm 2 Routing `saina-helm-2-routing-0.8b`), plus connected providers and published Studio endpoints. The list comes from your account, so new Helm releases show up without an extension update.
-- **Recent Decisions.** The latest decisions from your endpoints, filterable by endpoint, abstentions or errors. Click one to open the full record.
+This extension brings Helm, Saina's family of specialist decision models, and Saina Studio into VS Code and Cursor.
+
+- **Saina Studio MCP server for agent mode.** The extension registers `https://api.saina.run/v1/mcp`, so Copilot agent mode in VS Code and Cursor's agent can work with your decision endpoints, versions, decisions, traces, test cases, evaluations and datasets. It signs in with OAuth the first time a tool runs.
+- **Run Decision on Selection.** Select text or JSON, pick a model or a decision endpoint, and ask a Yes / No, Choose one or Rate on a scale question. Helm scores the options; the answer shows in a notification and the **Saina** output channel.
+- **Models.** The Helm models your account can use (Helm 3, Helm 2, Helm 2 Omni and specialist variants such as Helm 2 Routing), plus connected inference providers and your published decision endpoints. The list comes from your account, so new models show up without an extension update.
+- **Recent Decisions.** Decisions recorded by your endpoints, filterable by endpoint, abstentions or errors. Click one to open the full record, then turn failures into test cases in Studio.
 - **Snippets.** `saina-ask` and `saina-trace` in Python, `saina-ask` in JavaScript and TypeScript.
 
 ## Get started
