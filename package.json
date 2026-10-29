@@ -1,0 +1,223 @@
+{
+  "name": "saina",
+  "displayName": "Saina",
+  "description": "Saina Helm models in your editor: the Saina MCP server for agent mode, typed decisions on selected text, and recent decisions from Studio",
+  "version": "0.1.0",
+  "publisher": "saina",
+  "license": "MIT",
+  "icon": "media/icon.png",
+  "homepage": "https://saina.run",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/run-saina/vscode-saina.git"
+  },
+  "bugs": {
+    "url": "https://github.com/run-saina/vscode-saina/issues",
+    "email": "dev@saina.run"
+  },
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "AI",
+    "Machine Learning",
+    "Snippets"
+  ],
+  "keywords": [
+    "saina",
+    "helm",
+    "mcp",
+    "decisions",
+    "classification",
+    "llm"
+  ],
+  "main": "./dist/extension.js",
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "contributes": {
+    "configuration": {
+      "title": "Saina",
+      "properties": {
+        "saina.baseUrl": {
+          "type": "string",
+          "default": "https://api.saina.run",
+          "markdownDescription": "Saina API origin. Use your service origin for a self-hosted Helm, for example `http://localhost:8000`."
+        },
+        "saina.registerMcpServer": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Register the Saina MCP server (`<baseUrl>/v1/mcp`) so agent mode can use Saina tools. It signs in with OAuth on first use."
+        },
+        "saina.confirmBeforeRun": {
+          "type": "boolean",
+          "default": true,
+          "description": "Ask before sending text to a model. Every run is billed for the text sent."
+        }
+      }
+    },
+    "commands": [
+      {
+        "command": "saina.setApiKey",
+        "title": "Set API Key",
+        "category": "Saina"
+      },
+      {
+        "command": "saina.clearApiKey",
+        "title": "Clear API Key",
+        "category": "Saina"
+      },
+      {
+        "command": "saina.decide",
+        "title": "Run Decision on Selection",
+        "category": "Saina",
+        "icon": "$(play)"
+      },
+      {
+        "command": "saina.decideWith",
+        "title": "Run Decision",
+        "category": "Saina",
+        "icon": "$(play)"
+      },
+      {
+        "command": "saina.refresh",
+        "title": "Refresh",
+        "category": "Saina",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "saina.filterDecisions",
+        "title": "Filter Decisions",
+        "category": "Saina",
+        "icon": "$(filter)"
+      },
+      {
+        "command": "saina.openDecision",
+        "title": "Open Decision",
+        "category": "Saina"
+      },
+      {
+        "command": "saina.openStudio",
+        "title": "Open Studio",
+        "category": "Saina",
+        "icon": "$(link-external)"
+      },
+      {
+        "command": "saina.copyMcpConfig",
+        "title": "Copy MCP Server Config",
+        "category": "Saina"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "saina",
+          "title": "Saina",
+          "icon": "media/activity.svg"
+        }
+      ]
+    },
+    "views": {
+      "saina": [
+        {
+          "id": "saina.models",
+          "name": "Models"
+        },
+        {
+          "id": "saina.decisions",
+          "name": "Recent Decisions"
+        }
+      ]
+    },
+    "viewsWelcome": [
+      {
+        "view": "saina.models",
+        "contents": "Add a Saina API key to see your models and endpoints.\n[Set API Key](command:saina.setApiKey)\nNo account yet? [Sign up at saina.run](https://saina.run/signup)",
+        "when": "!saina.hasKey"
+      },
+      {
+        "view": "saina.decisions",
+        "contents": "No decisions yet. Select text and run [Run Decision on Selection](command:saina.decide), or publish an endpoint in [Studio](command:saina.openStudio).",
+        "when": "saina.hasKey"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "saina.refresh",
+          "when": "view == saina.models || view == saina.decisions",
+          "group": "navigation"
+        },
+        {
+          "command": "saina.filterDecisions",
+          "when": "view == saina.decisions",
+          "group": "navigation"
+        },
+        {
+          "command": "saina.openStudio",
+          "when": "view == saina.models",
+          "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "saina.decideWith",
+          "when": "view == saina.models && viewItem =~ /^(model|endpoint)$/",
+          "group": "inline"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "saina.decide",
+          "when": "editorHasSelection",
+          "group": "navigation@90"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "saina.decideWith",
+          "when": "false"
+        },
+        {
+          "command": "saina.openDecision",
+          "when": "false"
+        }
+      ]
+    },
+    "snippets": [
+      {
+        "language": "python",
+        "path": "./snippets/python.json"
+      },
+      {
+        "language": "javascript",
+        "path": "./snippets/javascript.json"
+      },
+      {
+        "language": "typescript",
+        "path": "./snippets/javascript.json"
+      }
+    ],
+    "mcpServerDefinitionProviders": [
+      {
+        "id": "saina",
+        "label": "Saina"
+      }
+    ]
+  },
+  "scripts": {
+    "build": "esbuild src/extension.ts --bundle --platform=node --format=cjs --target=node18 --external:vscode --outfile=dist/extension.js --minify",
+    "typecheck": "tsc --noEmit",
+    "test": "npm run typecheck && esbuild src/api.ts --bundle --platform=node --format=esm --outfile=test/out/api.mjs && node --test test/*.test.mjs",
+    "package": "npm run build && vsce package --no-dependencies",
+    "vscode:prepublish": "npm run build"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/vscode": "1.90.0",
+    "@vscode/vsce": "^3.2.0",
+    "esbuild": "^0.24.0",
+    "ovsx": "^0.10.0",
+    "typescript": "5.9.3"
+  }
+}

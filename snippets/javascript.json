@@ -1,0 +1,23 @@
+{
+  "Saina ask": {
+    "prefix": "saina-ask",
+    "description": "Ask a Saina Helm model a typed question (@run-saina/sdk)",
+    "body": [
+      "import { Saina } from '@run-saina/sdk';",
+      "",
+      "const client = new Saina({ apiKey: process.env.SAINA_API_KEY });",
+      "const answers = await client.ask({",
+      "  model: '${1|saina-helm,saina-helm-3-0.8b,saina-helm-2-0.8b,saina-helm-0.8b|}',",
+      "  state: ${2:text},",
+      "  questions: {",
+      "    ${3:team}: {",
+      "      type: '${4|single_choice,yes_no,rating,multi_choice|}',",
+      "      question: '${5:Which team should handle this?}',",
+      "      options: { ${6:billing: 'Billing', support: 'Support', other: 'Other'} },",
+      "    },",
+      "  },",
+      "});",
+      "$0"
+    ]
+  }
+}

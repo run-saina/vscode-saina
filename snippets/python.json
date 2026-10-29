@@ -1,0 +1,40 @@
+{
+  "Saina ask": {
+    "prefix": "saina-ask",
+    "description": "Ask a Saina Helm model a typed question and select with a confidence threshold",
+    "body": [
+      "from saina import Saina",
+      "",
+      "# Reads SAINA_API_KEY from the environment.",
+      "client = Saina()",
+      "answers = client.ask(",
+      "    model='${1|saina-helm,saina-helm-3-0.8b,saina-helm-2-0.8b,saina-helm-0.8b|}',",
+      "    state=${2:text},",
+      "    questions={",
+      "        '${3:team}': {",
+      "            'type': '${4|single_choice,yes_no,rating,multi_choice|}',",
+      "            'question': '${5:Which team should handle this?}',",
+      "            'options': [${6:'billing', 'support', 'other'}],",
+      "        },",
+      "    },",
+      ")",
+      "${7:selected} = answers['${3}'].select(threshold=${8:0.9})",
+      "if ${7}.accepted:",
+      "    ${9:pass}",
+      "else:",
+      "    ${10:pass}  # route to review",
+      "$0"
+    ]
+  },
+  "Saina trace": {
+    "prefix": "saina-trace",
+    "description": "Log a decision made elsewhere as a durable Saina trace",
+    "body": [
+      "from saina import Traces",
+      "",
+      "with Traces() as traces:",
+      "    trace_id = traces.log(task='${1:route ticket}', inputs=${2:{'ticket': text}}, outcome=${3:{'team': team}})",
+      "$0"
+    ]
+  }
+}
