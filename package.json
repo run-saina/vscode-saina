@@ -2,7 +2,7 @@
   "name": "saina",
   "displayName": "Saina",
   "description": "Build, test, and inspect AI decisions from VS Code. Use Helm models, decision endpoints, and Saina Studio with your coding agent.",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "publisher": "saina",
   "license": "MIT",
   "icon": "media/icon.png",
@@ -60,13 +60,13 @@
     },
     "commands": [
       {
-        "command": "saina.setApiKey",
-        "title": "Set API Key",
+        "command": "saina.signIn",
+        "title": "Sign In to Saina Studio",
         "category": "Saina"
       },
       {
-        "command": "saina.clearApiKey",
-        "title": "Clear API Key",
+        "command": "saina.signOut",
+        "title": "Sign Out",
         "category": "Saina"
       },
       {
@@ -134,13 +134,13 @@
     "viewsWelcome": [
       {
         "view": "saina.models",
-        "contents": "Add a Saina API key to see your models and endpoints.\n[Set API Key](command:saina.setApiKey)\nNo account yet? [Sign up at saina.run](https://saina.run/signup)",
-        "when": "!saina.hasKey"
+        "contents": "Sign in to Saina Studio to see your models and decision endpoints.\n[Sign In](command:saina.signIn)\nNo account yet? [Sign up at saina.run](https://saina.run/signup)",
+        "when": "!saina.signedIn"
       },
       {
         "view": "saina.decisions",
         "contents": "No decisions yet. Select text and run [Run Decision on Selection](command:saina.decide), or publish an endpoint in [Studio](command:saina.openStudio).",
-        "when": "saina.hasKey"
+        "when": "saina.signedIn"
       }
     ],
     "menus": {
@@ -183,6 +183,10 @@
         {
           "command": "saina.openDecision",
           "when": "false"
+        },
+        {
+          "command": "saina.signOut",
+          "when": "saina.signedIn"
         }
       ]
     },
@@ -210,7 +214,7 @@
   "scripts": {
     "build": "esbuild src/extension.ts --bundle --platform=node --format=cjs --target=node18 --external:vscode --outfile=dist/extension.js --minify",
     "typecheck": "tsc --noEmit",
-    "test": "npm run typecheck && esbuild src/api.ts --bundle --platform=node --format=esm --outfile=test/out/api.mjs && node --test test/*.test.mjs",
+    "test": "npm run typecheck && esbuild src/api.ts src/oauth.ts --bundle --platform=node --format=esm --outdir=test/out --out-extension:.js=.mjs && node --test test/*.test.mjs",
     "package": "npm run build && vsce package --no-dependencies",
     "vscode:prepublish": "npm run build"
   },

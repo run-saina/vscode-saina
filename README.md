@@ -12,22 +12,16 @@ Saina brings specialist decision models and Saina Studio into VS Code and Cursor
 - **Choose your model.** Helm 3, Helm 2, Helm 2 Omni and specialist variants such as Helm 2 Routing, or an inference provider connected in Studio. New models appear without an extension update.
 - **Start faster.** `saina-ask` snippets for Python, JavaScript and TypeScript, and `saina-trace` for Python.
 
-## Two ways to connect
-
-| | Studio in your coding agent | Decisions and sidebar |
-|---|---|---|
-| What it does | Work with endpoints, decisions, tests and datasets through your agent | Run a model or endpoint, browse recent decisions |
-| How you sign in | Sign in to Saina Studio the first time the agent uses a Saina tool | **Saina: Set API Key** (create the key in Studio) |
-| Needs an API key | No | Yes, for the hosted API. Not for a self-hosted server |
-
 ## Get started
 
 1. Install the extension and open the **Saina** panel in the activity bar.
-2. For decisions and the sidebar: run **Saina: Set API Key**. No account yet? [Sign up at saina.run](https://saina.run/signup).
-3. For your coding agent: ask it about your Saina endpoints. It prompts you to sign in to Saina Studio once.
-4. Select some text, right-click, and choose **Saina: Run Decision on Selection**.
+2. Click **Sign In** and approve access in Saina Studio. Choose **Read and write** if you want to run decisions from the editor; **Read only** is enough to browse. No account yet? [Sign up at saina.run](https://saina.run/signup).
+3. Select some text, right-click, and choose **Saina: Run Decision on Selection**.
+4. Ask your coding agent about your Saina endpoints. VS Code and Cursor sign the agent in to Saina Studio separately, the first time it uses a Saina tool.
 
-Direct calls to Saina's hosted API use credits; the free plan includes daily credits. The extension asks before sending an input, and you can turn that off. A self-hosted server runs on your own infrastructure.
+No API key needed. A self-hosted Saina server on `localhost` needs no sign-in at all.
+
+Running a decision on Saina's hosted API uses credits; the free plan includes daily credits. The extension asks before sending an input, and you can turn that off. A self-hosted server runs on your own infrastructure.
 
 Saina works with open models and external inference providers, so you can use hosted inference or your own infrastructure.
 
@@ -37,9 +31,9 @@ Saina is the decision layer for software systems. It builds specialist AI decisi
 
 ## Privacy
 
-- **Decisions and sidebar:** the extension calls `saina.baseUrl` directly with your API key. A decision sends the text you selected or typed; the sidebar reads your models, endpoints and recent decisions.
-- **Coding agent:** your editor connects to the Saina Studio MCP server at `<saina.baseUrl>/v1/mcp` after you approve access in Studio (read only, or read and write). The agent's tool calls read or change data in your Studio workspace according to that approval. You can revoke the connection in Studio settings.
-- The extension sends no telemetry.
+- **The extension** signs in to Saina Studio with OAuth and calls the Saina Studio MCP server at `<saina.baseUrl>/v1/mcp` with that access. It sends the text you select or type when you run a decision, and reads your models, endpoints and recent decisions for the sidebar. Its sign-in is kept in the editor's secret store; **Saina: Sign Out** revokes it.
+- **Your coding agent** has its own connection to the same MCP server, approved separately in Studio (read only, or read and write). Its tool calls read or change data in your Studio workspace according to that approval.
+- Revoke either connection in Saina Studio settings at any time. The extension sends no telemetry.
 
 ## Settings
 

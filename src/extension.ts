@@ -1,46 +1,53 @@
 import * as vscode from 'vscode';
-import { QUESTION_TYPES, SainaApi, buildQuestion, parseState, serviceOrigin, studioUrl, summarize } from './api';
+import { McpTransport, QUESTION_TYPES, RestTransport, SainaApi, buildQuestion, isLoopback, parseState, serviceOrigin, studioUrl, summarize } from './api';
 import type { Decision, Discovery } from './api';
+import { Auth, SignInRequired } from './auth';
 import { mcpConfig, registerMcp } from './mcp';
 import { createViews } from './views';
 import type { DecisionFilter, Node, Target } from './views';
 
-const KEY = 'saina.apiKey';
-
 export async function activate(context: vscode.ExtensionContext) {
   const config = () => vscode.workspace.getConfiguration('saina');
   const origin = () => serviceOrigin(config().get('baseUrl') || 'https://api.saina.run');
-  let apiKey = await context.secrets.get(KEY);
+  const isLocal = () => { try { return isLoopback(origin()); } catch { return false; } };
+  const auth = new Auth(context, origin);
+  await auth.load();
   let filter: DecisionFilter = {};
   const output = vscode.window.createOutputChannel('Saina');
 
-  const api = () => { try { return new SainaApi(origin(), apiKey); } catch (error) { void vscode.window.showErrorMessage((error as Error).message); return undefined; } };
-  const { models, decisions } = createViews(() => apiKey || isLocal() ? api() : undefined, () => filter);
-  const isLocal = () => { try { return /^http:\/\/(localhost|127\.0\.0\.1|\[::1\])/.test(origin()); } catch { return false; } };
-  const refresh = () => { void vscode.commands.executeCommand('setContext', 'saina.hasKey', !!apiKey || isLocal()); models.refresh(); decisions.refresh(); };
+  // Hosted Saina: Studio MCP tools with the signed-in OAuth token. A self-hosted loopback server: REST, no credentials.
+  const api = () => {
+    try { return new SainaApi(origin(), isLocal() ? new RestTransport(origin()) : new McpTransport(origin(), auth.token)); }
+    catch (error) { void vscode.window.showErrorMessage((error as Error).message); return undefined; }
+  };
+  const ready = () => auth.signedIn() || isLocal();
+  const { models, decisions } = createViews(() => ready() ? api() : undefined, () => filter);
+  const refresh = () => { void vscode.commands.executeCommand('setContext', 'saina.signedIn', ready()); models.refresh(); decisions.refresh(); };
   const syncMcp = registerMcp(context, origin, () => config().get('registerMcpServer', true));
+  const failed = (what: string, error: unknown) => {
+    if (error instanceof SignInRequired) { refresh(); void vscode.window.showWarningMessage('Saina: sign in to Saina Studio to continue.', 'Sign In').then(c => c && vscode.commands.executeCommand('saina.signIn')); return; }
+    // A read-only Studio connection cannot run decisions; the gateway names the missing scope.
+    if (/lacks [a-z-]+:rw/.test((error as Error).message)) {
+      void vscode.window.showWarningMessage('Your Saina Studio connection is read only. Sign in again and choose Read and write to run decisions.', 'Sign In Again').then(c => c && auth.signOut().then(() => vscode.commands.executeCommand('saina.signIn')));
+      return;
+    }
+    void vscode.window.showErrorMessage(what + ': ' + (error as Error).message);
+  };
 
   context.subscriptions.push(
     output,
     vscode.window.registerTreeDataProvider('saina.models', models),
     vscode.window.registerTreeDataProvider('saina.decisions', decisions),
-    context.secrets.onDidChange(async e => { if (e.key === KEY) { apiKey = await context.secrets.get(KEY); refresh(); } }),
+    auth.onDidChange(refresh),
     vscode.workspace.onDidChangeConfiguration(e => { if (e.affectsConfiguration('saina')) { syncMcp(); refresh(); } }),
 
-    vscode.commands.registerCommand('saina.setApiKey', async () => {
-      const value = await vscode.window.showInputBox({ title: 'Saina API key', prompt: 'Create a key in Studio → Keys. It is stored in the editor secret store.', password: true, ignoreFocusOut: true });
-      if (!value?.trim()) return;
-      // Discovery is the cheapest authenticated read; check the key before keeping it.
-      try { await new SainaApi(origin(), value.trim()).discover(); } catch (error) { void vscode.window.showErrorMessage('Saina rejected the key: ' + (error as Error).message); return; }
-      await context.secrets.store(KEY, value.trim());
-      void vscode.window.showInformationMessage('Saina API key saved.');
-    }),
-    vscode.commands.registerCommand('saina.clearApiKey', () => context.secrets.delete(KEY)),
+    vscode.commands.registerCommand('saina.signIn', () => isLocal() ? vscode.window.showInformationMessage('A self-hosted server at ' + origin() + ' needs no sign-in.') : auth.signIn()),
+    vscode.commands.registerCommand('saina.signOut', async () => { await auth.signOut(); void vscode.window.showInformationMessage('Signed out of Saina Studio.'); }),
     vscode.commands.registerCommand('saina.refresh', refresh),
     vscode.commands.registerCommand('saina.openStudio', () => vscode.env.openExternal(vscode.Uri.parse(studioUrl(origin())))),
     vscode.commands.registerCommand('saina.copyMcpConfig', async () => {
       await vscode.env.clipboard.writeText(mcpConfig(origin()));
-      void vscode.window.showInformationMessage('Copied. Paste it into .cursor/mcp.json or your client\'s MCP config; it signs in with OAuth on first use.');
+      void vscode.window.showInformationMessage('Copied. Paste it into .cursor/mcp.json or your client\'s MCP config; it signs in to Saina Studio on first use.');
     }),
     vscode.commands.registerCommand('saina.filterDecisions', async () => {
       const a = api(); if (!a) return;
@@ -58,7 +65,7 @@ export async function activate(context: vscode.ExtensionContext) {
       try {
         const doc = await vscode.workspace.openTextDocument({ language: 'json', content: JSON.stringify(await a.decision(id), null, 2) });
         await vscode.window.showTextDocument(doc, { preview: true });
-      } catch (error) { void vscode.window.showErrorMessage('Could not open decision: ' + (error as Error).message); }
+      } catch (error) { failed('Could not open decision', error); }
     }),
     vscode.commands.registerCommand('saina.decide', () => decide()),
     vscode.commands.registerCommand('saina.decideWith', (node?: Node) => decide(node?.target)),
@@ -66,14 +73,14 @@ export async function activate(context: vscode.ExtensionContext) {
 
   async function decide(target?: Target) {
     const a = api(); if (!a) return;
-    if (!apiKey && !isLocal()) { void vscode.commands.executeCommand('saina.setApiKey'); return; }
+    if (!ready() && !await vscode.commands.executeCommand<boolean>('saina.signIn')) return;
     const editor = vscode.window.activeTextEditor;
     let text = editor && !editor.selection.isEmpty ? editor.document.getText(editor.selection) : '';
     if (!text) text = await vscode.window.showInputBox({ title: 'Input', prompt: 'Text or JSON to decide on', ignoreFocusOut: true }) ?? '';
     if (!text.trim()) return;
 
     let discovery: Discovery;
-    try { discovery = await a.discover(); } catch (error) { void vscode.window.showErrorMessage('Saina: ' + (error as Error).message); return; }
+    try { discovery = await a.discover(); } catch (error) { failed('Saina', error); return; }
     target ??= await pickTarget(discovery);
     if (!target) return;
 
@@ -95,7 +102,7 @@ export async function activate(context: vscode.ExtensionContext) {
     try {
       decision = await vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: 'Saina: asking ' + label }, () =>
         target!.kind === 'model' ? a.decideWithModel(target!.provider, target!.model, state, question, {}) : a.decideWithEndpoint(target!.endpoint, target!.version, state));
-    } catch (error) { void vscode.window.showErrorMessage('Saina: ' + (error as Error).message); return; }
+    } catch (error) { failed('Saina', error); return; }
     output.appendLine('[' + new Date().toISOString() + '] ' + label + ' · ' + decision.decision_id);
     for (const line of summarize(decision)) output.appendLine('  ' + line);
     const choice = await vscode.window.showInformationMessage(summarize(decision).join(' · '), 'Open Decision', 'Show Log');

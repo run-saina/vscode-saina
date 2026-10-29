@@ -30,55 +30,89 @@ export function serviceOrigin(baseUrl: unknown): string {
 export const mcpUrl = (origin: string) => origin + '/v1/mcp';
 export const studioUrl = (origin: string) => origin.replace('://api.', '://') + '/studio/';
 
-export class SainaApi {
-  constructor(readonly origin: string, private readonly apiKey: string | undefined, private readonly fetchImpl: typeof fetch = fetch) {}
+// One Studio operation, addressable both as a REST route (self-hosted servers) and as an MCP tool (hosted Saina over OAuth).
+export interface Operation { tool: string; method: 'GET' | 'POST'; path: string; args: Record<string, unknown>; pathArgs?: string[] }
+export interface Transport { invoke<T>(op: Operation, timeout?: number): Promise<T> }
 
-  async request<T>(method: 'GET' | 'POST', path: string, body?: unknown, timeout = 60): Promise<T> {
-    const headers: Record<string, string> = { ...CLIENT_HEADER, Accept: 'application/json' };
-    if (this.apiKey) headers.Authorization = 'Bearer ' + this.apiKey;
-    if (body !== undefined) headers['Content-Type'] = 'application/json';
-    const response = await this.fetchImpl(this.origin + path, { method, headers, body: body === undefined ? undefined : JSON.stringify(body), redirect: 'error', signal: AbortSignal.timeout(timeout * 1000) });
-    const text = await response.text();
-    let data: unknown = undefined;
-    try { data = text ? JSON.parse(text) : undefined; } catch { data = undefined; }
-    if (!response.ok) {
-      // Error bodies are {error: {code, message}}; never echo request headers.
-      const error = (data as { error?: { code?: string; message?: string } } | undefined)?.error;
-      throw new ApiError(error?.message || 'Saina returned HTTP ' + response.status, response.status, error?.code);
-    }
+function errorOf(data: unknown, status: number): ApiError {
+  // Error bodies are {error: {code, message}}; never echo request headers.
+  const error = (data as { error?: { code?: string; message?: string } } | undefined)?.error;
+  return new ApiError(error?.message || 'Saina returned HTTP ' + status, status, error?.code);
+}
+
+async function readJson(response: Response): Promise<unknown> {
+  const text = await response.text();
+  try { return text ? JSON.parse(text) : undefined; } catch { return undefined; }
+}
+
+// A self-hosted server that does not authenticate: the Studio REST routes, no credentials.
+export class RestTransport implements Transport {
+  constructor(readonly origin: string, private readonly fetchImpl: typeof fetch = fetch) {}
+  async invoke<T>(op: Operation, timeout = 60): Promise<T> {
+    const args = { ...op.args };
+    let path = op.path;
+    for (const key of op.pathArgs ?? []) { path = path.replace('{' + key + '}', encodeURIComponent(String(args[key]))); delete args[key]; }
+    delete args.confirm_cost;
+    const query = op.method === 'GET' ? new URLSearchParams(Object.entries(args).filter(([, v]) => v !== undefined).map(([k, v]) => [k, String(v)])).toString() : '';
+    const response = await this.fetchImpl(this.origin + '/v1/studio/' + path + (query ? '?' + query : ''), { method: op.method, headers: { ...CLIENT_HEADER, Accept: 'application/json', ...(op.method === 'POST' ? { 'Content-Type': 'application/json' } : {}) },
+      body: op.method === 'POST' ? JSON.stringify(args) : undefined, redirect: 'error', signal: AbortSignal.timeout(timeout * 1000) });
+    const data = await readJson(response);
+    if (!response.ok) throw errorOf(data, response.status);
     return data as T;
   }
+}
+
+// Hosted Saina: the Studio MCP server, with an OAuth access token. Tools carry the same account scoping as Studio.
+export class McpTransport implements Transport {
+  private id = 0;
+  constructor(readonly origin: string, private readonly token: () => Promise<string>, private readonly fetchImpl: typeof fetch = fetch) {}
+  async invoke<T>(op: Operation, timeout = 60): Promise<T> {
+    const args = Object.fromEntries(Object.entries(op.args).filter(([, v]) => v !== undefined));
+    const response = await this.fetchImpl(mcpUrl(this.origin), { method: 'POST', headers: { ...CLIENT_HEADER, Accept: 'application/json, text/event-stream', 'Content-Type': 'application/json', Authorization: 'Bearer ' + await this.token() },
+      body: JSON.stringify({ jsonrpc: '2.0', id: ++this.id, method: 'tools/call', params: { name: op.tool, arguments: args } }), redirect: 'error', signal: AbortSignal.timeout(timeout * 1000) });
+    const data = await readJson(response) as { result?: { isError?: boolean; content?: Array<{ text?: string }> }; error?: { message?: string } } | undefined;
+    if (!response.ok) throw errorOf(data, response.status);
+    if (data?.error) throw new ApiError(data.error.message || 'Saina MCP error', 400);
+    let payload: unknown = undefined;
+    try { payload = JSON.parse(data?.result?.content?.[0]?.text ?? ''); } catch { payload = undefined; }
+    if (data?.result?.isError) throw errorOf(payload, 400);
+    return payload as T;
+  }
+}
+
+export class SainaApi {
+  constructor(readonly origin: string, private readonly transport: Transport) {}
 
   async discover(): Promise<Discovery> {
-    const data = await this.request<Partial<Discovery>>('GET', '/v1/studio/discovery');
+    const data = await this.transport.invoke<Partial<Discovery>>({ tool: 'get_discovery', method: 'GET', path: 'discovery', args: {} });
     return { saina: { models: data?.saina?.models ?? [] }, providers: data?.providers ?? [], endpoints: data?.endpoints ?? [] };
   }
 
   decisions(query: { endpoint?: string; status?: string; abstained?: boolean; limit?: number; offset?: number } = {}): Promise<DecisionPage> {
-    const params = new URLSearchParams({ limit: String(query.limit ?? 50), offset: String(query.offset ?? 0) });
-    if (query.endpoint) params.set('endpoint', query.endpoint);
-    if (query.status) params.set('status', query.status);
-    if (query.abstained) params.set('abstained', 'true');
-    return this.request('GET', '/v1/studio/decisions?' + params);
+    return this.transport.invoke({ tool: 'list_decisions', method: 'GET', path: 'decisions',
+      args: { limit: query.limit ?? 50, offset: query.offset ?? 0, endpoint: query.endpoint, status: query.status, abstained: query.abstained ? 'true' : undefined } });
   }
 
   decision(id: string): Promise<Decision> {
-    return this.request('GET', '/v1/studio/decisions/' + encodeURIComponent(id));
+    return this.transport.invoke({ tool: 'get_decision', method: 'GET', path: 'decisions/{decision_id}', args: { decision_id: id }, pathArgs: ['decision_id'] });
   }
 
   // Model mode posts an ad hoc definition to the playground, as Studio and the n8n node do.
+  // confirm_cost is sent only after the person confirmed the run in the editor.
   async decideWithModel(provider: string, model: string, state: unknown, questions: Record<string, unknown>, thresholds: Record<string, unknown>): Promise<Decision> {
     const definition = { name: 'playground', schema_version: '2.2.0', model: { provider_id: provider, name: model }, questions_mode: 'defined', questions,
       ...(Object.keys(thresholds).length ? { answer_thresholds: thresholds } : {}), inputs: { format: 'text', modalities: ['text'] } };
-    const response = await this.request<{ decision: unknown }>('POST', '/v1/studio/playground/test', { definition, request: { state } });
+    const response = await this.transport.invoke<{ decision: unknown }>({ tool: 'test_model', method: 'POST', path: 'playground/test', args: { definition, request: { state }, confirm_cost: true } });
     return readDecision(response?.decision);
   }
 
   // Endpoint mode records the decision, so it shows up in Recent Decisions and can take outcomes.
   async decideWithEndpoint(endpoint: string, version: 'production' | number, state: unknown): Promise<Decision> {
-    return readDecision(await this.request('POST', '/v1/studio/endpoints/' + encodeURIComponent(endpoint) + '/decide', { state, version }));
+    return readDecision(await this.transport.invoke({ tool: 'run_decision_endpoint', method: 'POST', path: 'endpoints/{endpoint}/decide', args: { endpoint, version, state, confirm_cost: true }, pathArgs: ['endpoint'] }));
   }
 }
+
+export const isLoopback = (origin: string) => /^http:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/.test(origin);
 
 export function readDecision(raw: unknown): Decision {
   const d = raw as Decision;
