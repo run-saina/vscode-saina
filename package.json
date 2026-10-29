@@ -1,8 +1,8 @@
 {
   "name": "saina",
   "displayName": "Saina",
-  "description": "Saina, the decision layer for software systems: Helm decision models, decision endpoints and the Saina Studio MCP server in your editor",
-  "version": "0.1.0",
+  "description": "Build, test, and inspect AI decisions from VS Code. Use Helm models, decision endpoints, and Saina Studio with your coding agent.",
+  "version": "0.1.1",
   "publisher": "saina",
   "license": "MIT",
   "icon": "media/icon.png",
@@ -20,16 +20,18 @@
   },
   "categories": [
     "AI",
-    "Machine Learning",
-    "Snippets"
+    "Machine Learning"
   ],
   "keywords": [
     "saina",
     "helm",
     "mcp",
-    "decisions",
+    "ai decisions",
+    "decision endpoints",
+    "agent",
     "classification",
-    "llm"
+    "routing",
+    "snippets"
   ],
   "main": "./dist/extension.js",
   "activationEvents": [
@@ -47,12 +49,12 @@
         "saina.registerMcpServer": {
           "type": "boolean",
           "default": true,
-          "markdownDescription": "Register the Saina MCP server (`<baseUrl>/v1/mcp`) so agent mode can use Saina tools. It signs in with OAuth on first use."
+          "markdownDescription": "Make Saina Studio available to your coding agent through the MCP server at `<baseUrl>/v1/mcp`. You sign in to Studio the first time the agent uses it."
         },
         "saina.confirmBeforeRun": {
           "type": "boolean",
           "default": true,
-          "description": "Ask before sending text to a model. Every run is billed for the text sent."
+          "description": "Ask before sending an input to a model. Calls to Saina's hosted API use credits."
         }
       }
     },

@@ -85,7 +85,7 @@ export async function activate(context: vscode.ExtensionContext) {
     }
     const label = target.kind === 'model' ? target.model : 'endpoint ' + target.endpoint;
     if (config().get('confirmBeforeRun', true)) {
-      const go = await vscode.window.showWarningMessage('Send ' + text.length.toLocaleString() + ' characters to ' + label + '? The run is billed for the text sent.', { modal: true }, 'Run', 'Run and stop asking');
+      const go = await vscode.window.showWarningMessage('Send ' + text.length.toLocaleString() + ' characters to ' + label + '? Calls to Saina\'s hosted API use credits.', { modal: true }, 'Run', 'Run and stop asking');
       if (!go) return;
       if (go === 'Run and stop asking') await config().update('confirmBeforeRun', false, vscode.ConfigurationTarget.Global);
     }
